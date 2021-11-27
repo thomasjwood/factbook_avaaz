@@ -28,6 +28,8 @@ t2$mods <- t2$data %>%
   map(
     function(i)
       
+      # i <- t2$data[[1]]
+      
       lm(
         ans_num ~ cond,
         data = i
@@ -37,8 +39,7 @@ t2$mods <- t2$data %>%
 
 t3 <- pmap_dfr(
   .l = t2 %>% 
-    select(-data) %>%  
-    unname,
+    select(-data),
   function(treat, study, mods)
     mods %>% 
     emmeans(~cond) %>% 
@@ -58,8 +59,7 @@ t3 <- pmap_dfr(
     
     pmap_dfr(
       .l = t2 %>% 
-        select(-data) %>%  
-        unname,
+        select(-data) ,
       function(treat, study, mods)
         mods %>% 
         emmeans(
@@ -72,30 +72,42 @@ t3 <- pmap_dfr(
           treat = treat,
           study = study
         )
-    ) %>% 
+      ) %>% 
       filter(
-        (
-          level1 ==  "misinfo" &
-            level2 == "itemsonly"
-        ) |
-          (
-            level1 == "correction" &
-              level2 == "misinfo"
+        contrast %>% 
+          is_in(
+            c("misinfo - itemsonly",
+              "correction - misinfo")
           )
+        # (
+        #   level1 ==  "misinfo" &
+        #     level2 == "itemsonly"
+        # ) |
+        #   (
+        #     level1 == "correction" &
+        #       level2 == "misinfo"
+        #   )
       ) %>% 
       mutate(
         cond = case_when(
-          level1 == "misinfo" &
-            level2 == "itemsonly" ~ "Misinformation effect",
-          level1 == "correction" &
-            level2 == "misinfo" ~ "Correction effect"
+          contrast %>% 
+            equals("misinfo - itemsonly") ~ "Misinformation effect",
+          contrast %>% 
+            equals("correction - misinfo") ~ "Correction effect"
+          # level1 == "misinfo" &
+          #   level2 == "itemsonly"
+          # level1 == "correction" &
+          #   level2 == "misinfo" ~ "Correction effect"
         ),
         treat = treat,
         type = "contrasts"
       ) %>% 
       select(
-        type, study, treat, cond, estimate, std.error, p.value
-      )
+        type, study, treat, cond, estimate, std.error, adj.p.value
+      ) %>% 
+      rename(
+        p.value = adj.p.value
+        )
   ) %>% 
   mutate(
     lo = estimate %>% 
@@ -152,21 +164,20 @@ t3$study %<>%
 
 t3$treat <- t3$treat %>% 
   mapvalues(
-    t3$treat %>%
-      levels,
-    c("Measles spread by immigrants",
-      "Greta Thunberg highly paid",
-      "Trump denigrates Republicans",
-      "Ilhan Omar attends terror camp",
+    c("trump", "fiveg", "omar", "greta", "measles", "Overall"),
+    c("Trump denigrates Republicans",
       "5G causes cancer",
+      "Ilhan Omar attends terror camp",
+      "Greta Thunberg highly paid",
+      "Measles spread by immigrants",
       "Overall")
   ) %>% 
   factor(
-    c("Measles spread by immigrants",
-      "Greta Thunberg highly paid",
-      "Trump denigrates Republicans",
-      "Ilhan Omar attends terror camp",
+    c("Trump denigrates Republicans",
       "5G causes cancer",
+      "Ilhan Omar attends terror camp", 
+      "Greta Thunberg highly paid",
+      "Measles spread by immigrants", 
       "Overall")
   )
 
@@ -277,8 +288,9 @@ ggplot() +
         cond = t3$cond[1:3] %>% 
           rev
       ),
-    size  = 2
-    ) +
+    size  = 2,
+    fontface = "italic"
+  ) +
   geom_point(
     aes(
       x = estimate, y = treat, color = cond
@@ -314,8 +326,12 @@ ggplot() +
       xint = 0,
       type = t3$type %>% 
         levels %>% 
-        extract(2:3)
-    ),
+        extract(2:3) %>% 
+        factor(
+          t3$type %>% 
+            levels
+          )
+      ),
     size = .3,
     linetype = "dashed"
   ) +
@@ -331,7 +347,8 @@ ggplot() +
           str_detect(
             "Group means"
           )
-      )
+      ),
+    family = "texgyre"
     ) +
   geom_linerangeh(
     aes(xmin = lo, xmax = hi, y = treat),
@@ -365,10 +382,11 @@ ggplot() +
           not
       ),
     size = 1.5
-    ) +
+  ) +
   scale_color_manual(
     values = c("grey1", "grey40", "grey79")
   ) +
+  # scale_color_grey(start = .01, end = .85) +
   facet_grid(study ~ type, scales = "free_x", space = "free_x") +
   labs(
     x = "",
