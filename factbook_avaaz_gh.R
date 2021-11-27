@@ -347,9 +347,8 @@ ggplot() +
           str_detect(
             "Group means"
           )
-      ),
-    family = "texgyre"
-    ) +
+      )
+  ) +
   geom_linerangeh(
     aes(xmin = lo, xmax = hi, y = treat),
     data = t3 %>% 
